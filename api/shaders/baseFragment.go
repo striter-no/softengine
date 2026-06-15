@@ -37,29 +37,41 @@ func calculateShadow(fragPos vec4.T, lightSpaceMatrix mgl32.Mat4, shadowDepth []
 	return shadow
 }
 
-func calculateLightContribution(lightDir vec3.T, distance float32, lightColor vec3.T, intensity float32, constant, linear, quadratic float32, norm vec3.T, viewDir vec3.T, shininess float32) vec3.T {
-	diffuse := norm[0]*lightDir[0] + norm[1]*lightDir[1] + norm[2]*lightDir[2]
-	if diffuse < 0 {
-		diffuse = 0
+func calculateLightContribution(
+	lightDir vec3.T, distance float32, lightColor vec3.T, intensity float32,
+	constant, linear, quadratic float32, norm vec3.T, viewDir vec3.T,
+	matDiffuse vec3.T, matSpecular vec3.T, shininess float32,
+) vec3.T {
+	// 1. Diffuse
+	diffuseFactor := norm[0]*lightDir[0] + norm[1]*lightDir[1] + norm[2]*lightDir[2]
+	if diffuseFactor < 0 {
+		diffuseFactor = 0
 	}
 
-	specular := float32(0.0)
-	if diffuse > 0 {
+	// 2. Specular (Phong)
+	specularFactor := float32(0.0)
+	if diffuseFactor > 0 {
 		negL := vec3.T{-lightDir[0], -lightDir[1], -lightDir[2]}
 		dotNL := negL[0]*norm[0] + negL[1]*norm[1] + negL[2]*norm[2]
-		reflectDir := vec3.T{negL[0] - 2.0*dotNL*norm[0], negL[1] - 2.0*dotNL*norm[1], negL[2] - 2.0*dotNL*norm[2]}
+		reflectDir := vec3.T{
+			negL[0] - 2.0*dotNL*norm[0],
+			negL[1] - 2.0*dotNL*norm[1],
+			negL[2] - 2.0*dotNL*norm[2],
+		}
 		specDot := viewDir[0]*reflectDir[0] + viewDir[1]*reflectDir[1] + viewDir[2]*reflectDir[2]
 		if specDot < 0 {
 			specDot = 0
 		}
-		specular = float32(math.Pow(float64(specDot), float64(shininess)))
+		specularFactor = float32(math.Pow(float64(specDot), float64(shininess)))
 	}
 
+	// 3. Attenuation
 	attenuation := intensity / (constant + linear*distance + quadratic*(distance*distance))
+
 	return vec3.T{
-		lightColor[0] * (diffuse + specular) * attenuation,
-		lightColor[1] * (diffuse + specular) * attenuation,
-		lightColor[2] * (diffuse + specular) * attenuation,
+		(matDiffuse[0]*lightColor[0]*diffuseFactor + matSpecular[0]*lightColor[0]*specularFactor) * attenuation,
+		(matDiffuse[1]*lightColor[1]*diffuseFactor + matSpecular[1]*lightColor[1]*specularFactor) * attenuation,
+		(matDiffuse[2]*lightColor[2]*diffuseFactor + matSpecular[2]*lightColor[2]*specularFactor) * attenuation,
 	}
 }
 
@@ -111,11 +123,13 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 	}
 
 	// 1. Ambient
-	ambient := ctx.Lights.Ambient.Color
-	resultR := texR * ambient[0]
-	resultG := texG * ambient[1]
-	resultB := texB * ambient[2]
-	shininess := float32(64.0)
+	resultR := ctx.Material.Ambient[0] * ctx.Lights.Ambient.Color[0]
+	resultG := ctx.Material.Ambient[1] * ctx.Lights.Ambient.Color[1]
+	resultB := ctx.Material.Ambient[2] * ctx.Lights.Ambient.Color[2]
+
+	baseDiffuseR := texR * ctx.Material.Diffuse[0]
+	baseDiffuseG := texG * ctx.Material.Diffuse[1]
+	baseDiffuseB := texB * ctx.Material.Diffuse[2]
 
 	// 2. Directional Light
 	dl := ctx.Lights.Directional
@@ -126,7 +140,13 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 		dirShadow = calculateShadow(fragPos, ctx.DirLightSpaceMatrix, ctx.DirShadowDepth, ctx.DirShadowWidth, ctx.DirShadowHeight)
 	}
 
-	contrib := calculateLightContribution(lightDir, 0.0, dl.Color, 1.0, 1.0, 0.0, 0.0, norm, viewDir, shininess)
+	contrib := calculateLightContribution(
+		lightDir, 0.0, dl.Color, 1.0, 1.0, 0.0, 0.0,
+		norm, viewDir,
+		vec3.T{baseDiffuseR, baseDiffuseG, baseDiffuseB},
+		ctx.Material.Specular, ctx.Material.Shininess,
+	)
+
 	shadowFactor := 1.0 - dirShadow
 	resultR += texR * contrib[0] * shadowFactor
 	resultG += texG * contrib[1] * shadowFactor
@@ -142,7 +162,13 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 			lDir[2] /= distance
 		}
 
-		contrib := calculateLightContribution(lDir, distance, pl.Color, pl.Intensity, pl.Constant, pl.Linear, pl.Quadratic, norm, viewDir, shininess)
+		contrib := calculateLightContribution(
+			lDir, distance, pl.Color, pl.Intensity, pl.Constant, pl.Linear, pl.Quadratic,
+			norm, viewDir,
+			vec3.T{baseDiffuseR, baseDiffuseG, baseDiffuseB},
+			ctx.Material.Specular, ctx.Material.Shininess,
+		)
+
 		resultR += texR * contrib[0]
 		resultG += texG * contrib[1]
 		resultB += texB * contrib[2]
@@ -178,7 +204,12 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 				spotShadow = calculateShadow(fragPos, ctx.SpotLightSpaceMatrix, ctx.SpotShadowDepth, ctx.SpotShadowWidth, ctx.SpotShadowHeight)
 			}
 
-			contrib := calculateLightContribution(lDir, distance, sl.Color, sl.Intensity*spotIntensity, sl.Constant, sl.Linear, sl.Quadratic, norm, viewDir, shininess)
+			contrib := calculateLightContribution(
+				lDir, distance, sl.Color, sl.Intensity*spotIntensity, sl.Constant, sl.Linear, sl.Quadratic,
+				norm, viewDir,
+				vec3.T{baseDiffuseR, baseDiffuseG, baseDiffuseB},
+				ctx.Material.Specular, ctx.Material.Shininess,
+			)
 
 			spotShadowFactor := 1.0 - spotShadow
 			resultR += texR * contrib[0] * spotShadowFactor

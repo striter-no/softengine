@@ -351,6 +351,8 @@ func (e *Engine) DrawObjects() error {
 			SpotShadowWidth:      e.SpotShadowFBO.Width,
 			SpotShadowHeight:     e.SpotShadowFBO.Height,
 			IsSkybox:             obj.IsSkybox,
+
+			Material: obj.Material,
 		}
 
 		(*e.VertShader).SetUniform("ctx", ctx)

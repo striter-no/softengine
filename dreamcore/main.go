@@ -22,6 +22,29 @@ func main() {
 
 	defer engine.End()
 
+	// Materials
+
+	waterMaterial := shaders.Material{
+		Ambient:   vec3.T{0.81, 0.81, 0.81},
+		Diffuse:   vec3.T{0.8, 0.9, 1},
+		Specular:  vec3.T{0.9, 0.9, 0.9},
+		Shininess: 4.0,
+	}
+
+	goldMaterial := shaders.Material{
+		Ambient:   vec3.T{0.24725, 0.1995, 0.0745},
+		Diffuse:   vec3.T{0.75164, 0.60648, 0.22648},
+		Specular:  vec3.T{0.628281, 0.555802, 0.366065},
+		Shininess: 128.0,
+	}
+
+	texturedMaterial := shaders.Material{
+		Ambient:   vec3.T{0.1, 0.1, 0.1},
+		Diffuse:   vec3.T{1.0, 1.0, 1.0},
+		Specular:  vec3.T{0.5, 0.5, 0.5},
+		Shininess: 32.0,
+	}
+
 	// Init
 	engine.RScreen.BackColor = vec3.T{0.8, 0.8, 1}
 	engine.LightConfig.Ambient = lights.AmbientLight{Color: vec3.T{0.1, 0.1, 0.1}}
@@ -91,7 +114,7 @@ func main() {
 				vec3.T{posX, 0, posZ},
 				vec3.T{0, 0, 0},
 				vec3.T{1, 1, 1},
-				chunkMesh, grassTex, true, false,
+				chunkMesh, grassTex, waterMaterial, true, false,
 			)
 
 			chunkObj.AddLOD(api.GenerateLOD(chunkMesh, 0.2), 60)
@@ -109,7 +132,7 @@ func main() {
 		vec3.T{0, 100, 0},
 		vec3.T{0, 0, 0},
 		vec3.T{30, 30, 30},
-		monkey, onigiriTex, true, true,
+		monkey, onigiriTex, goldMaterial, true, true,
 	)
 
 	if _, err = engine.AddObject(monkeyObj); err != nil {
@@ -129,7 +152,7 @@ func main() {
 		vec3.T{0, 0, 0},
 		vec3.T{0, 0, 0},
 		vec3.T{10, 10, 10},
-		skyboxMesh, skyboxTex, false, false,
+		skyboxMesh, skyboxTex, texturedMaterial, false, false,
 	)
 	skyboxObj.IsSkybox = true
 

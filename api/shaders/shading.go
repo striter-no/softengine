@@ -19,6 +19,8 @@ type ShaderContext struct {
 	IsStraight bool
 	IsSkybox   bool
 
+	Material Material
+
 	// --- Directional Shadow ---
 	HasDirShadow        bool
 	DirLightSpaceMatrix mgl32.Mat4

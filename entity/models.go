@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/striter-no/softengine/api/shaders"
 	textures "github.com/striter-no/softgo/loader"
 	"github.com/striter-no/softgo/render"
 	"github.com/ungerik/go3d/vec3"
@@ -62,7 +63,8 @@ type LOD struct {
 }
 
 type Object3D struct {
-	Texture ModelTexture
+	Texture  ModelTexture
+	Material shaders.Material
 
 	Position vec3.T
 	Rotation mgl32.Quat
@@ -79,7 +81,7 @@ type Object3D struct {
 	IsSkybox    bool
 }
 
-func NewObject3D(position, rotation, scale vec3.T, mesh []render.TBO, texture ModelTexture, canBeLit, castShadows bool) *Object3D {
+func NewObject3D(position, rotation, scale vec3.T, mesh []render.TBO, texture ModelTexture, Material shaders.Material, canBeLit, castShadows bool) *Object3D {
 	var maxSq float32
 	for _, tbo := range mesh {
 		v0Sq := tbo.V0[0]*tbo.V0[0] + tbo.V0[1]*tbo.V0[1] + tbo.V0[2]*tbo.V0[2]
@@ -111,6 +113,7 @@ func NewObject3D(position, rotation, scale vec3.T, mesh []render.TBO, texture Mo
 		modelMatrix: mgl32.Ident4(),
 		CanBeLit:    canBeLit,
 		CastShadows: castShadows,
+		Material:    Material,
 	}
 }
 

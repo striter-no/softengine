@@ -80,7 +80,7 @@ func main() {
 		vec3.T{0, 0, 0},
 		vec3.T{0, 0, 0},
 		vec3.T{1, 1, 1},
-		mesh, cubeTex, true,
+		mesh, cubeTex, true, true,
 	)
 
 	cubeObj.AddLOD(meshMed, 15.0)
