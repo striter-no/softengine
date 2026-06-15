@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -12,11 +13,13 @@ import (
 	"github.com/striter-no/softengine/entity"
 	"github.com/striter-no/softengine/lights"
 	"github.com/striter-no/softengine/sounds"
+	"github.com/striter-no/softgo/api"
 	sapi "github.com/striter-no/softgo/api"
 	"github.com/striter-no/softgo/api/keyboard"
 	"github.com/striter-no/softgo/api/mouse"
 	"github.com/striter-no/softgo/render"
 	"github.com/striter-no/stg/graphics"
+	"github.com/ungerik/go3d/vec2"
 	"github.com/ungerik/go3d/vec3"
 	"github.com/ungerik/go3d/vec4"
 )
@@ -41,9 +44,27 @@ type Engine struct {
 
 	MainFBO     *render.Framebuffer
 	SoundSystem *sounds.SoundSystem
+
+	ShadowFBO        *render.Framebuffer // for Directional Light
+	SpotShadowFBO    *render.Framebuffer // for Spot Light
+	ShadowVertShader *sapi.VertexShader
+	ShadowFragShader *sapi.FragmentShader
 }
 
 func NewEngine(ctx context.Context) (*Engine, error) {
+
+	shadowRes := 512
+
+	shadowVert := api.NewVertexShader(func(pos, norm *vec3.T, color *vec4.T, uv *vec2.T, shader *sapi.VertexShader) render.VertexOut {
+		scAny, _ := shader.GetUniform("ctx")
+		sc := scAny.(*shaders.ShaderContext)
+		v4 := mgl32.Vec4{pos[0], pos[1], pos[2], 1.0}
+		posN := sc.MVP.Mul4x1(v4)
+		return render.VertexOut{Pos: posN}
+	})
+	shadowFrag := api.NewFragShader(func(u, v float32, c vec4.T, n vec3.T, fp vec4.T, ctx *sapi.FragmentShader) vec4.T {
+		return vec4.T{0, 0, 0, 1.0}
+	})
 
 	Mouse, err := mouse.NewWindowMouse()
 	if err != nil {
@@ -80,11 +101,16 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 		FragShader: &s.FragShader,
 		VertShader: &s.VertexShader,
 		LightConfig: lights.LightingConfig{
-			PointLights: make(map[int]*lights.PointLight),
-			SpotLights:  make(map[int]*lights.SpotLight),
+			PointLights: make(map[int]*lights.PointLight, 0),
+			SpotLights:  make(map[int]*lights.SpotLight, 0),
 		},
 		MainFBO:     render.NewFramebuffer(s.Screen.Width*s.SSAAFactor, s.Screen.Height*s.SSAAFactor, false),
 		SoundSystem: SoundSystem,
+
+		ShadowFBO:        render.NewFramebuffer(shadowRes, shadowRes, true),
+		SpotShadowFBO:    render.NewFramebuffer(shadowRes, shadowRes, true),
+		ShadowVertShader: shadowVert,
+		ShadowFragShader: shadowFrag,
 	}, nil
 }
 
@@ -174,6 +200,73 @@ func (e *Engine) DrawObjects() error {
 
 	e.MainFBO.Clear(e.RScreen.BackColor)
 
+	ogShaderV := *e.RScreen.VertexShader
+	ogShaderF := *e.RScreen.FragShader
+
+	var dirLightSpaceMatrix mgl32.Mat4
+	var hasDirShadow bool
+	var spotLightSpaceMatrix mgl32.Mat4
+	var hasSpotShadow bool
+
+	if e.LightConfig.Directional.CastShadows {
+		e.ShadowFBO.Clear(vec3.T{})
+		e.RScreen.VertexShader = e.ShadowVertShader
+		e.RScreen.FragShader = e.ShadowFragShader
+
+		dir := e.LightConfig.Directional.Direction
+		dirPos := vec3.T{-dir[0] * 50000.0, -dir[1] * 50000.0, -dir[2] * 50000.0}
+
+		dirLightSpaceMatrix = lights.GetDirectionalLightSpaceMatrix(dirPos, dir)
+		hasDirShadow = true
+
+		for _, obj := range e.Objects {
+			if !obj.CastShadows {
+				continue
+			}
+
+			model := obj.GetModelMatrix()
+			ctx := &shaders.ShaderContext{
+				MVP: dirLightSpaceMatrix.Mul4(model),
+			}
+			(*e.ShadowVertShader).SetUniform("ctx", ctx)
+			e.RScreen.DrawCall(obj.GetActiveMesh(10), e.ShadowFBO)
+		}
+	}
+
+	// 2. PASS: Spot Light Shadow
+	for _, spot := range e.LightConfig.SpotLights {
+		if spot.CastShadows {
+			e.SpotShadowFBO.Clear(vec3.T{})
+			e.RScreen.VertexShader = e.ShadowVertShader
+			e.RScreen.FragShader = e.ShadowFragShader
+
+			halfAngleRad := float32(math.Acos(float64(spot.OuterCos)))
+			fovRadians := halfAngleRad * 2.0
+
+			fovRadians += float32(2.0 * math.Pi / 180.0)
+
+			spotLightSpaceMatrix = lights.GetSpotLightSpaceMatrix(spot.Position, spot.Direction, fovRadians, 1.0, 0.1, 1000.0)
+			hasSpotShadow = true
+
+			for _, obj := range e.Objects {
+				if !obj.CastShadows {
+					continue
+				}
+
+				model := obj.GetModelMatrix()
+				ctx := &shaders.ShaderContext{
+					MVP: spotLightSpaceMatrix.Mul4(model),
+				}
+				(*e.ShadowVertShader).SetUniform("ctx", ctx)
+				e.RScreen.DrawCall(obj.GetActiveMesh(10), e.SpotShadowFBO)
+			}
+			break
+		}
+	}
+
+	e.RScreen.VertexShader = &ogShaderV
+	e.RScreen.FragShader = &ogShaderF
+
 	type RenderNode struct {
 		Obj              *entity.Object3D
 		DistanceToCamera float32
@@ -241,6 +334,19 @@ func (e *Engine) DrawObjects() error {
 
 			Lights:     e.LightConfig,
 			IsStraight: !obj.CanBeLit,
+
+			HasDirShadow:        hasDirShadow,
+			DirLightSpaceMatrix: dirLightSpaceMatrix,
+			DirShadowDepth:      e.ShadowFBO.DepthBuffer,
+			DirShadowWidth:      e.ShadowFBO.Width,
+			DirShadowHeight:     e.ShadowFBO.Height,
+
+			HasSpotShadow:        hasSpotShadow,
+			SpotLightSpaceMatrix: spotLightSpaceMatrix,
+			SpotShadowDepth:      e.SpotShadowFBO.DepthBuffer,
+			SpotShadowWidth:      e.SpotShadowFBO.Width,
+			SpotShadowHeight:     e.SpotShadowFBO.Height,
+			IsSkybox:             obj.IsSkybox,
 		}
 
 		(*e.VertShader).SetUniform("ctx", ctx)

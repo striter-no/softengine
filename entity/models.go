@@ -75,9 +75,11 @@ type Object3D struct {
 	isDirty     bool
 	modelMatrix mgl32.Mat4
 	CanBeLit    bool
+	CastShadows bool
+	IsSkybox    bool
 }
 
-func NewObject3D(position, rotation, scale vec3.T, mesh []render.TBO, texture ModelTexture, canBeLit bool) *Object3D {
+func NewObject3D(position, rotation, scale vec3.T, mesh []render.TBO, texture ModelTexture, canBeLit, castShadows bool) *Object3D {
 	var maxSq float32
 	for _, tbo := range mesh {
 		v0Sq := tbo.V0[0]*tbo.V0[0] + tbo.V0[1]*tbo.V0[1] + tbo.V0[2]*tbo.V0[2]
@@ -108,6 +110,7 @@ func NewObject3D(position, rotation, scale vec3.T, mesh []render.TBO, texture Mo
 		isDirty:     true,
 		modelMatrix: mgl32.Ident4(),
 		CanBeLit:    canBeLit,
+		CastShadows: castShadows,
 	}
 }
 

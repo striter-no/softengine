@@ -65,35 +65,28 @@ func generateTerrainMesh(
 	verts := make([][]vec3.T, width)
 	colors := make([][]vec4.T, width)
 
-	// 1. Генерируем вершины и высоту
-	for x := 0; x < width; x++ {
+	for x := range width {
 		verts[x] = make([]vec3.T, depth)
 		colors[x] = make([]vec4.T, depth)
 
 		for z := 0; z < depth; z++ {
-			// Получаем шум
 			rawNoise := noiseFunc(float64(x)*noiseScale, float64(z)*noiseScale)
 
-			// Если твоя библиотека шума возвращает от -1 до 1, раскомментируй следующую строку:
-			// rawNoise = (rawNoise + 1.0) / 2.0
+			rawNoise = (rawNoise + 1.0) / 2.0
 
 			h := float32(rawNoise)
 			y := h * heightScale
 
-			// Центрируем меш
 			xPos := float32(x)*cellSize - float32(width)*cellSize/2.0
 			zPos := float32(z)*cellSize - float32(depth)*cellSize/2.0
 
 			verts[x][z] = vec3.T{xPos, y, zPos}
-
-			// Если ты используешь текстуру травы (grass.png), цвет можно сделать просто белым:
 			colors[x][z] = vec4.T{1.0, 1.0, 1.0, 1.0}
 		}
 	}
 
-	// 2. Рассчитываем нормали для освещения
 	normals := make([][]vec3.T, width)
-	for x := 0; x < width; x++ {
+	for x := range width {
 		normals[x] = make([]vec3.T, depth)
 	}
 
@@ -116,37 +109,31 @@ func generateTerrainMesh(
 		}
 	}
 
-	for x := 0; x < width; x++ {
-		for z := 0; z < depth; z++ {
+	for x := range width {
+		for z := range depth {
 			normals[x][z] = vecNormalize(normals[x][z])
 		}
 	}
 
-	// 3. Собираем треугольники с ПРАВИЛЬНЫМИ UV
 	var mesh []render.TBO
 	for x := 0; x < width-1; x++ {
 		for z := 0; z < depth-1; z++ {
 
-			// UV-координаты для одного квадратика (от 0 до 1)
 			uv00 := vec2.T{0, 0}
 			uv01 := vec2.T{0, 1}
 			uv10 := vec2.T{1, 0}
 			uv11 := vec2.T{1, 1}
 
-			// Первый треугольник квадрата
 			mesh = append(mesh, render.TBO{
 				V0: verts[x][z], V1: verts[x][z+1], V2: verts[x+1][z],
-				// Назначаем координаты углов
 				UV0: uv00, UV1: uv01, UV2: uv10,
 				N0: normals[x][z], N1: normals[x][z+1], N2: normals[x+1][z],
 				C0: colors[x][z], C1: colors[x][z+1], C2: colors[x+1][z],
 				OmniDir: false,
 			})
 
-			// Второй треугольник квадрата
 			mesh = append(mesh, render.TBO{
 				V0: verts[x+1][z], V1: verts[x][z+1], V2: verts[x+1][z+1],
-				// Назначаем координаты углов
 				UV0: uv10, UV1: uv01, UV2: uv11,
 				N0: normals[x+1][z], N1: normals[x][z+1], N2: normals[x+1][z+1],
 				C0: colors[x+1][z], C1: colors[x][z+1], C2: colors[x+1][z+1],

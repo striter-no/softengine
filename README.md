@@ -64,6 +64,7 @@ Supported asset types:
 ## Running
 
 Run the included example scene:
+Firstly install `libXfixes-devel` for HID on X11, then:
 
 ```sh
 go run ./examples/main.go
@@ -95,6 +96,8 @@ Then run the example scene
 - `examples/` Example scenes
 - `dreamcore/` Additional demo application
 - `cgo/` Audio backend bindings
+
 ## License
+
 Licensed under the GNU General Public License v3.0.
 See the LICENSE file for details.

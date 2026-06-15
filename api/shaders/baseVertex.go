@@ -19,8 +19,14 @@ func vertShader(vert *vec3.T, normal *vec3.T, color *vec4.T, uv *vec2.T, s *api.
 	n := mgl32.Vec4{normal[0], normal[1], normal[2], 0.0}
 	transformedNormal := ctx.Model.Mul4x1(n)
 
+	clipPos := ctx.MVP.Mul4x1(v)
+
+	if ctx.IsSkybox {
+		clipPos[2] = clipPos[3] * 0.99999
+	}
+
 	return render.VertexOut{
-		Pos:     ctx.MVP.Mul4x1(v),
+		Pos:     clipPos,
 		Normal:  vec3.T{transformedNormal[0], transformedNormal[1], transformedNormal[2]},
 		UV:      *uv,
 		Color:   *color,
