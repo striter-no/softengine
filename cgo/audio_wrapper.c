@@ -1,6 +1,6 @@
 // audio_wrapper.c
 #define MINIAUDIO_IMPLEMENTATION
-#include "miniaudio.h"
+#include "./vendor/miniaudio.h"
 #include "audio_wrapper.h"
 
 ma_engine engine;
