@@ -26,9 +26,9 @@ func main() {
 	engine.RScreen.BackColor = vec3.T{0.8, 0.8, 1}
 	engine.LightConfig.Ambient = lights.AmbientLight{Color: vec3.T{0.1, 0.1, 0.1}}
 	engine.LightConfig.Directional = lights.DirectLight{
-		Color:       vec3.T{.8, 0.9, 1},
+		Color:       vec3.T{1, 1, 1},
 		Direction:   vec3.T{-0.2, -.5, -0.2},
-		CastShadows: true,
+		CastShadows: false,
 	}
 	spotlight := lights.NewSpotLight(
 		vec3.T{1.0, .0, 1.0},
@@ -45,7 +45,7 @@ func main() {
 		shaders.NewBaseVertexShader(),
 	)
 
-	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 100, 0.1, 10000, 80)
+	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 100, 0.01, 1000, 80)
 	engine.Camera.Locked = true
 
 	// Ambient
@@ -66,24 +66,40 @@ func main() {
 
 	// Objects
 
-	grassTex, err := entity.NewModelImageTexture("./assets/textures/grass.jpg")
+	grassTex, err := entity.NewModelImageTexture("./assets/textures/water.jpg")
+	grassTex.Texture.GenerateMipmaps(6)
+
 	if err != nil {
 		panic(err)
 	}
 
 	// grassMesh, err := assets.LoadOBJ("./assets/meshes/plane.obj")
-	generator := entity.NewTerrainGenerator(100.0, 0.2, 50)
-	grassMesh := generator.Generate(150, 150, 10)
+	cellSize := float32(20.0)
+	chunkSize := 5
+	generator := entity.NewTerrainGenerator(200.0, 0.1, cellSize)
 
-	grassObj := entity.NewObject3D(
-		vec3.T{0, 0, 0},
-		vec3.T{0, 0, 0},
-		vec3.T{1, 1, 1},
-		grassMesh, grassTex, true, true,
-	)
+	chunks := make([]int, 0)
+	for cx := -10; cx <= 10; cx++ {
+		for cz := -10; cz <= 10; cz++ {
 
-	if _, err = engine.AddObject(grassObj); err != nil {
-		panic(err)
+			chunkMesh := generator.GenerateChunk(cx, cz, chunkSize, chunkSize, 0.0)
+
+			posX := float32(cx*chunkSize) * cellSize
+			posZ := float32(cz*chunkSize) * cellSize
+
+			chunkObj := entity.NewObject3D(
+				vec3.T{posX, 0, posZ},
+				vec3.T{0, 0, 0},
+				vec3.T{1, 1, 1},
+				chunkMesh, grassTex, true, false,
+			)
+
+			chunkObj.AddLOD(api.GenerateLOD(chunkMesh, 0.2), 60)
+			chunkObj.AddLOD(api.GenerateLOD(chunkMesh, 0.5), 30)
+			id, _ := engine.AddObject(chunkObj)
+
+			chunks = append(chunks, id)
+		}
 	}
 
 	monkey, _ := assets.LoadOBJ("./assets/meshes/suzanne.obj")
@@ -122,27 +138,70 @@ func main() {
 	}
 
 	// Run
+	zoom := 1.
 	engine.RScreen.SSAAFactor = 1
 	for engine.IsRunning() {
 		if engine.Keyboard.IsKeyPressed(keyboard.KeyEsc) {
 			break
 		}
 
+		realZoom := zoom
+		if engine.Keyboard.IsKeyPressed(keyboard.KeyShift) {
+			if zoom < 9 {
+				zoom *= 1.1
+				realZoom = zoom
+			} else {
+				zoom *= 1.001
+				realZoom = 9
+			}
+		} else {
+			zoom *= 0.8
+			if zoom <= 1.1 {
+				zoom = 1
+			}
+
+			realZoom = zoom
+		}
+
 		engine.UpdateHID()
 		engine.SoundSystem.UpdateListener(engine.Camera.Position)
-
 		engine.SoundSystem.ChangeIDPosition(windID, engine.Camera.Position)
+
+		engine.Camera.FOV = float32(90. / realZoom)
+
+		// if realZoom > 3 {
+		// 	engine.Camera.Near = 0.8
+		// } else {
+
+		// }
 
 		skyboxObj.Position = engine.Camera.Position
 		skyboxObj.UpdateMat()
-		// spotlight.Position = engine.Camera.Position
 
 		monkeyObj.LookAt(engine.Camera.Position, true)
 
 		engine.Camera.Speed = 200 * engine.TSystem.DeltaTime
 
-		grassMesh := generator.Generate(150, 150, float64(engine.TSystem.Ticks)/10)
-		grassObj.Mesh = grassMesh
+		inDump := 0
+		for cx := -10; cx <= 10; cx++ {
+			for cz := -10; cz <= 10; cz++ {
+				chunkMesh := generator.GenerateChunk(cx, cz, chunkSize, chunkSize, float64(engine.TSystem.Ticks)/10)
+
+				obj, err := engine.GetObject(chunks[inDump])
+				if err != nil {
+					panic(err)
+				}
+				obj.Mesh = chunkMesh
+
+				obj.LODs = make([]entity.LOD, 0)
+				obj.AddLOD(api.GenerateLOD(chunkMesh, 0.2), 60)
+				obj.AddLOD(api.GenerateLOD(chunkMesh, 0.5), 30)
+				inDump++
+			}
+		}
+
+		// grassMesh := generator.Generate(150, 150, float64(engine.TSystem.Ticks)/10)
+		// grassObj.Mesh = grassMesh
 
 		if engine.TSystem.Ticks%50 == 0 {
 			engine.SoundSystem.ChangeIDPosition(shotID, vec3.T{

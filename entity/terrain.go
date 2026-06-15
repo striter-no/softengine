@@ -50,94 +50,96 @@ func (g *TerrainGenerator) perlinNoise(x, y, z float64) float64 {
 	return g.p.Noise3D(x, y, z)
 }
 
-func (g *TerrainGenerator) Generate(width, depth int, z float64) []render.TBO {
-	return generateTerrainMesh(width, depth, g.cellSize, g.heightScale, g.noiseScale, g.perlinNoise, z)
-}
+func (g *TerrainGenerator) GenerateChunk(chunkX, chunkZ int, cellsX, cellsZ int, zShift float64) []render.TBO {
 
-func generateTerrainMesh(
-	width, depth int,
-	cellSize float32,
-	heightScale float32,
-	noiseScale float64,
-	noiseFunc func(x, y, z float64) float64,
-	zShift float64,
-) []render.TBO {
+	gridW := cellsX + 3
+	gridD := cellsZ + 3
 
-	verts := make([][]vec3.T, width)
-	colors := make([][]vec4.T, width)
+	verts := make([][]vec3.T, gridW)
+	normals := make([][]vec3.T, gridW)
 
-	for x := range width {
-		verts[x] = make([]vec3.T, depth)
-		colors[x] = make([]vec4.T, depth)
+	for i := range gridW {
+		verts[i] = make([]vec3.T, gridD)
+		normals[i] = make([]vec3.T, gridD)
 
-		for z := 0; z < depth; z++ {
-			rawNoise := noiseFunc(float64(x)*noiseScale, float64(z)*noiseScale, zShift*noiseScale)
+		lx := i - 1
+		gx := chunkX*cellsX + lx
 
+		for j := range gridD {
+			lz := j - 1
+			gz := chunkZ*cellsZ + lz
+
+			rawNoise := g.perlinNoise(float64(gx)*g.noiseScale, float64(gz)*g.noiseScale, zShift*g.noiseScale)
 			rawNoise = (rawNoise + 1.0) / 2.0
 
-			h := float32(rawNoise)
-			y := h * heightScale
+			y := float32(rawNoise) * g.heightScale
 
-			xPos := float32(x)*cellSize - float32(width)*cellSize/2.0
-			zPos := float32(z)*cellSize - float32(depth)*cellSize/2.0
+			xPos := float32(lx) * g.cellSize
+			zPos := float32(lz) * g.cellSize
 
-			verts[x][z] = vec3.T{xPos, y, zPos}
-			colors[x][z] = vec4.T{1.0, 1.0, 1.0, 1.0}
+			verts[i][j] = vec3.T{xPos, y, zPos}
 		}
 	}
 
-	normals := make([][]vec3.T, width)
-	for x := range width {
-		normals[x] = make([]vec3.T, depth)
-	}
-
-	for x := 0; x < width-1; x++ {
-		for z := 0; z < depth-1; z++ {
-			v00 := verts[x][z]
-			v01 := verts[x][z+1]
-			v10 := verts[x+1][z]
-			v11 := verts[x+1][z+1]
+	for i := 0; i < gridW-1; i++ {
+		for j := 0; j < gridD-1; j++ {
+			v00 := verts[i][j]
+			v01 := verts[i][j+1]
+			v10 := verts[i+1][j]
+			v11 := verts[i+1][j+1]
 
 			n1 := vecCross(vecSub(v01, v00), vecSub(v10, v00))
-			normals[x][z] = vecAdd(normals[x][z], n1)
-			normals[x][z+1] = vecAdd(normals[x][z+1], n1)
-			normals[x+1][z] = vecAdd(normals[x+1][z], n1)
+			normals[i][j] = vecAdd(normals[i][j], n1)
+			normals[i][j+1] = vecAdd(normals[i][j+1], n1)
+			normals[i+1][j] = vecAdd(normals[i+1][j], n1)
 
 			n2 := vecCross(vecSub(v11, v10), vecSub(v01, v10))
-			normals[x+1][z] = vecAdd(normals[x+1][z], n2)
-			normals[x][z+1] = vecAdd(normals[x][z+1], n2)
-			normals[x+1][z+1] = vecAdd(normals[x+1][z+1], n2)
+			normals[i+1][j] = vecAdd(normals[i+1][j], n2)
+			normals[i][j+1] = vecAdd(normals[i][j+1], n2)
+			normals[i+1][j+1] = vecAdd(normals[i+1][j+1], n2)
 		}
 	}
 
-	for x := range width {
-		for z := range depth {
-			normals[x][z] = vecNormalize(normals[x][z])
+	for i := range gridW {
+		for j := range gridD {
+			normals[i][j] = vecNormalize(normals[i][j])
 		}
 	}
 
 	var mesh []render.TBO
-	for x := 0; x < width-1; x++ {
-		for z := 0; z < depth-1; z++ {
+	for i := 1; i <= cellsX; i++ {
+		for j := 1; j <= cellsZ; j++ {
+
+			v00 := verts[i][j]
+			v01 := verts[i][j+1]
+			v10 := verts[i+1][j]
+			v11 := verts[i+1][j+1]
+
+			n00 := normals[i][j]
+			n01 := normals[i][j+1]
+			n10 := normals[i+1][j]
+			n11 := normals[i+1][j+1]
 
 			uv00 := vec2.T{0, 0}
 			uv01 := vec2.T{0, 1}
 			uv10 := vec2.T{1, 0}
 			uv11 := vec2.T{1, 1}
 
+			c00 := vec4.T{1.0, 1.0, 1.0, 1.0}
+
 			mesh = append(mesh, render.TBO{
-				V0: verts[x][z], V1: verts[x][z+1], V2: verts[x+1][z],
+				V0: v00, V1: v01, V2: v10,
 				UV0: uv00, UV1: uv01, UV2: uv10,
-				N0: normals[x][z], N1: normals[x][z+1], N2: normals[x+1][z],
-				C0: colors[x][z], C1: colors[x][z+1], C2: colors[x+1][z],
+				N0: n00, N1: n01, N2: n10,
+				C0: c00, C1: c00, C2: c00,
 				OmniDir: false,
 			})
 
 			mesh = append(mesh, render.TBO{
-				V0: verts[x+1][z], V1: verts[x][z+1], V2: verts[x+1][z+1],
+				V0: v10, V1: v01, V2: v11,
 				UV0: uv10, UV1: uv01, UV2: uv11,
-				N0: normals[x+1][z], N1: normals[x][z+1], N2: normals[x+1][z+1],
-				C0: colors[x+1][z], C1: colors[x][z+1], C2: colors[x+1][z+1],
+				N0: n10, N1: n01, N2: n11,
+				C0: c00, C1: c00, C2: c00,
 				OmniDir: false,
 			})
 		}

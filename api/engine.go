@@ -282,6 +282,8 @@ func (e *Engine) DrawObjects() error {
 		center := mgl32.Vec4{0, 0, 0, 1}
 		clipCenter := mvp.Mul4x1(center)
 
+		dist := clipCenter.W()
+
 		maxScale := obj.Scale[0]
 		if obj.Scale[1] > maxScale {
 			maxScale = obj.Scale[1]
@@ -290,28 +292,32 @@ func (e *Engine) DrawObjects() error {
 			maxScale = obj.Scale[2]
 		}
 
-		actualRadius := obj.BaseRadius * maxScale
+		actualRadius := 2 * (obj.BaseRadius * maxScale)
 
-		if clipCenter.W() < -actualRadius {
+		if dist < e.Camera.Near-actualRadius || dist > e.Camera.Far+actualRadius {
 			continue
 		}
 
-		if clipCenter.W() > 0 {
-			ndcX := clipCenter.X() / clipCenter.W()
-			ndcY := clipCenter.Y() / clipCenter.W()
-			ndcZ := clipCenter.Z() / clipCenter.W()
+		if dist > 0.1 {
+			ndcX := clipCenter.X() / dist
+			ndcY := clipCenter.Y() / dist
 
-			bound := 1.5 * (1.0 + (actualRadius / clipCenter.W()))
-			zbound := (1.0 + (actualRadius / clipCenter.W()))
+			projFactor := e.Camera.Projection[0]
+			if projFactor == 0 {
+				projFactor = 1.0
+			}
 
-			if ndcX < -bound || ndcX > bound || ndcY < -bound || ndcY > bound || ndcZ > zbound || ndcZ < -zbound {
+			margin := (actualRadius * projFactor) / dist
+			bound := 1.0 + margin + 0.1
+
+			if ndcX < -bound || ndcX > bound || ndcY < -bound || ndcY > bound {
 				continue
 			}
 		}
 
 		renderQueue = append(renderQueue, RenderNode{
 			Obj:              obj,
-			DistanceToCamera: clipCenter.W(),
+			DistanceToCamera: dist,
 			MVP:              mvp,
 		})
 	}

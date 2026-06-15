@@ -69,7 +69,19 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 
 	var texColor vec4.T
 	if ctx.Texture != nil {
-		texColor = ctx.Texture.Sample(u, v)
+
+		if len(ctx.Texture.Mipmaps) != 0 {
+			lDir := vec3.T{
+				ctx.ViewPos[0] - fragPos[0],
+				ctx.ViewPos[1] - fragPos[1],
+				ctx.ViewPos[2] - fragPos[2],
+			}
+			distance := float32(math.Sqrt(float64(lDir[0]*lDir[0] + lDir[1]*lDir[1] + lDir[2]*lDir[2])))
+
+			texColor = ctx.Texture.SampleLod(u, v, distance, 50)
+		} else {
+			texColor = ctx.Texture.Sample(u, v)
+		}
 	} else {
 		texColor = col
 	}
