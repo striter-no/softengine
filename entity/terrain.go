@@ -46,12 +46,12 @@ func NewTerrainGenerator(heightScale float32, noiseScale float64, cellSize float
 	}
 }
 
-func (g *TerrainGenerator) perlinNoise(x, y float64) float64 {
-	return g.p.Noise2D(x, y)
+func (g *TerrainGenerator) perlinNoise(x, y, z float64) float64 {
+	return g.p.Noise3D(x, y, z)
 }
 
-func (g *TerrainGenerator) Generate(width, depth int) []render.TBO {
-	return generateTerrainMesh(width, depth, g.cellSize, g.heightScale, g.noiseScale, g.perlinNoise)
+func (g *TerrainGenerator) Generate(width, depth int, z float64) []render.TBO {
+	return generateTerrainMesh(width, depth, g.cellSize, g.heightScale, g.noiseScale, g.perlinNoise, z)
 }
 
 func generateTerrainMesh(
@@ -59,7 +59,8 @@ func generateTerrainMesh(
 	cellSize float32,
 	heightScale float32,
 	noiseScale float64,
-	noiseFunc func(x, y float64) float64,
+	noiseFunc func(x, y, z float64) float64,
+	zShift float64,
 ) []render.TBO {
 
 	verts := make([][]vec3.T, width)
@@ -70,7 +71,7 @@ func generateTerrainMesh(
 		colors[x] = make([]vec4.T, depth)
 
 		for z := 0; z < depth; z++ {
-			rawNoise := noiseFunc(float64(x)*noiseScale, float64(z)*noiseScale)
+			rawNoise := noiseFunc(float64(x)*noiseScale, float64(z)*noiseScale, zShift*noiseScale)
 
 			rawNoise = (rawNoise + 1.0) / 2.0
 

@@ -73,7 +73,7 @@ func main() {
 
 	// grassMesh, err := assets.LoadOBJ("./assets/meshes/plane.obj")
 	generator := entity.NewTerrainGenerator(100.0, 0.2, 50)
-	grassMesh := generator.Generate(150, 150)
+	grassMesh := generator.Generate(150, 150, 10)
 
 	grassObj := entity.NewObject3D(
 		vec3.T{0, 0, 0},
@@ -140,6 +140,9 @@ func main() {
 		monkeyObj.LookAt(engine.Camera.Position, true)
 
 		engine.Camera.Speed = 200 * engine.TSystem.DeltaTime
+
+		grassMesh := generator.Generate(150, 150, float64(engine.TSystem.Ticks)/10)
+		grassObj.Mesh = grassMesh
 
 		if engine.TSystem.Ticks%50 == 0 {
 			engine.SoundSystem.ChangeIDPosition(shotID, vec3.T{
