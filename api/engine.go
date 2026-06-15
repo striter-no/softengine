@@ -292,25 +292,23 @@ func (e *Engine) DrawObjects() error {
 			maxScale = obj.Scale[2]
 		}
 
-		actualRadius := (obj.BaseRadius * maxScale)
+		actualRadius := obj.BaseRadius * maxScale * 1.1
 
 		if dist < e.Camera.Near-actualRadius || dist > e.Camera.Far+actualRadius {
 			continue
 		}
 
-		if dist > 0.1 {
+		if dist > actualRadius*1.5 {
 			ndcX := clipCenter.X() / dist
 			ndcY := clipCenter.Y() / dist
 
-			projFactor := e.Camera.Projection[0]
-			if projFactor == 0 {
-				projFactor = 1.0
-			}
+			projX := e.Camera.Projection[0]
+			projY := e.Camera.Projection[5]
 
-			margin := (actualRadius * projFactor) / dist
-			bound := 1.0 + margin + 0.1
+			boundX := 1.0 + (actualRadius * projX / dist) + 0.2
+			boundY := 1.0 + (actualRadius * projY / dist) + 0.2
 
-			if ndcX < -bound || ndcX > bound || ndcY < -bound || ndcY > bound {
+			if ndcX < -boundX || ndcX > boundX || ndcY < -boundY || ndcY > boundY {
 				continue
 			}
 		}
