@@ -292,7 +292,7 @@ func (e *Engine) DrawObjects() error {
 			maxScale = obj.Scale[2]
 		}
 
-		actualRadius := 2 * (obj.BaseRadius * maxScale)
+		actualRadius := (obj.BaseRadius * maxScale)
 
 		if dist < e.Camera.Near-actualRadius || dist > e.Camera.Far+actualRadius {
 			continue

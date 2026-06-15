@@ -45,7 +45,7 @@ func main() {
 		shaders.NewBaseVertexShader(),
 	)
 
-	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 100, 0.01, 1000, 80)
+	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 100, 0.1, 1000, 80)
 	engine.Camera.Locked = true
 
 	// Ambient
