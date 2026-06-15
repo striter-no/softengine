@@ -50,7 +50,7 @@ func main() {
 	)
 
 	// Adding camera
-	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 0.1)
+	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 100, 0.1, 2000, 90)
 	engine.Camera.Locked = true
 
 	// Adding object
