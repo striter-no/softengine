@@ -32,7 +32,7 @@ func main() {
 	}
 
 	goldMaterial := shaders.Material{
-		Ambient:   vec3.T{0.24725, 0.1995, 0.0745},
+		Ambient:   vec3.T{0.24725 * 3, 0.1995 * 3, 0.0745 * 3},
 		Diffuse:   vec3.T{0.75164, 0.60648, 0.22648},
 		Specular:  vec3.T{0.628281, 0.555802, 0.366065},
 		Shininess: 128.0,
@@ -63,12 +63,22 @@ func main() {
 	)
 	engine.NewSpotLight(spotlight)
 
+	pointlight := &lights.PointLight{
+		Color:     vec3.T{1., 1., 1.},
+		Position:  vec3.T{110, 263, -70},
+		Intensity: 50,
+		Constant:  2,
+		Linear:    0.09,
+		Quadratic: 0.032,
+	}
+	engine.NewPointLight(pointlight)
+
 	engine.UpdateShaders(
 		shaders.NewBaseFragmentShader(),
 		shaders.NewBaseVertexShader(),
 	)
 
-	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 100, 0.1, 1000, 80)
+	engine.InitCamera(vec3.T{0, 0, 2}, 0.08, 100, 0.1, 2000, 80)
 	engine.Camera.Locked = true
 
 	// Ambient
@@ -139,6 +149,26 @@ func main() {
 		panic(err)
 	}
 
+	monkeys := make([]int, 0)
+	var s float32 = 300.
+	for range 10 {
+		clone := monkeyObj.Clone()
+		clone.Position = vec3.T{
+			rand.Float32()*s*2 - s,
+			180 + rand.Float32()*20,
+			rand.Float32()*s*2 - s,
+		}
+		sc := rand.Float32() + 0.5
+		clone.SetScale(vec3.T{sc * 20, sc * 20, sc * 20})
+
+		var id int
+		if id, err = engine.AddObject(clone); err != nil {
+			panic(err)
+		}
+
+		monkeys = append(monkeys, id)
+	}
+
 	// Skybox
 
 	skyboxTex, err := entity.NewModelImageTexture("./assets/textures/skybox.png")
@@ -159,6 +189,10 @@ func main() {
 	if _, err = engine.AddObject(skyboxObj); err != nil {
 		panic(err)
 	}
+
+	followId := 0
+	followPath := make([]vec3.T, 0)
+	n := 40
 
 	// Run
 	zoom := 1.
@@ -192,17 +226,28 @@ func main() {
 
 		engine.Camera.FOV = float32(90. / realZoom)
 
-		// if realZoom > 3 {
-		// 	engine.Camera.Near = 0.8
-		// } else {
-
-		// }
-
 		skyboxObj.Position = engine.Camera.Position
 		skyboxObj.UpdateMat()
 
 		monkeyObj.LookAt(engine.Camera.Position, true)
 
+		if engine.TSystem.Ticks%10 == 0 {
+			start := monkeyObj.Position
+			followPath = make([]vec3.T, 0, n)
+			for i := range n {
+				t := float32(i) / float32(n-1)
+				v := lerp(start, engine.Camera.Position, t)
+				followPath = append(followPath, v)
+			}
+			followId = 0
+		}
+
+		if followId < len(followPath) {
+			monkeyObj.Position = followPath[followId]
+			followId++
+		}
+
+		pointlight.Position = engine.Camera.Position
 		engine.Camera.Speed = 200 * engine.TSystem.DeltaTime
 
 		inDump := 0
@@ -223,8 +268,13 @@ func main() {
 			}
 		}
 
-		// grassMesh := generator.Generate(150, 150, float64(engine.TSystem.Ticks)/10)
-		// grassObj.Mesh = grassMesh
+		for _, mid := range monkeys {
+			obj, err := engine.GetObject(mid)
+			if err != nil {
+				panic(err)
+			}
+			obj.RotateEuler(vec3.T{0.1, 0, 0.3})
+		}
 
 		if engine.TSystem.Ticks%50 == 0 {
 			engine.SoundSystem.ChangeIDPosition(shotID, vec3.T{
@@ -239,5 +289,13 @@ func main() {
 			panic(err)
 		}
 		engine.Blit()
+	}
+}
+
+func lerp(a, b vec3.T, t float32) vec3.T {
+	return vec3.T{
+		a[0] + t*(b[0]-a[0]),
+		a[1] + t*(b[1]-a[1]),
+		a[2] + t*(b[2]-a[2]),
 	}
 }

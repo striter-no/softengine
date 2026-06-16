@@ -373,6 +373,10 @@ func (e *Engine) Blit() {
 		0, 0, fmt.Sprintf("FPS: %.1f", e.RScreen.CurrentFPS), graphics.NewFGPixel(255, 255, 255, ""),
 	)
 
+	e.RScreen.Screen.SetText(
+		0, 1, fmt.Sprintf("Camera: %v\n Direction: %v", e.Camera.Position, e.Camera.Rotation), graphics.NewFGPixel(255, 255, 255, ""),
+	)
+
 	e.RScreen.Screen.Blit()
 	e.TSystem.FPS = float32(e.RScreen.CurrentFPS)
 	e.TSystem.DeltaTime = float32(time.Since(e.lastUpdate).Milliseconds()) / 1000

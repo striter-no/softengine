@@ -156,6 +156,7 @@ func (o *Object3D) GetActiveMesh(distance float32) []render.TBO {
 
 func (o *Object3D) Clone() *Object3D {
 	return &Object3D{
+		Material: o.Material,
 		CanBeLit: o.CanBeLit,
 		LODs:     o.LODs,
 		Texture:  o.Texture,
