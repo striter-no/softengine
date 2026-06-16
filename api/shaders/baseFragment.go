@@ -90,12 +90,12 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 			}
 			distance := float32(math.Sqrt(float64(lDir[0]*lDir[0] + lDir[1]*lDir[1] + lDir[2]*lDir[2])))
 
-			texColor = ctx.Texture.SampleLod(u, v, distance, 50)
+			texColor = ctx.Texture.SampleLod(u, v, distance, 20)
 		} else {
 			texColor = ctx.Texture.Sample(u, v)
 		}
 	} else {
-		texColor = col
+		texColor = ctx.Color //col
 	}
 
 	texR := texColor[0] / 255.0

@@ -3,12 +3,14 @@ package entity
 import (
 	"errors"
 	"math"
+	"sort"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/striter-no/softengine/api/shaders"
 	textures "github.com/striter-no/softgo/loader"
 	"github.com/striter-no/softgo/render"
 	"github.com/ungerik/go3d/vec3"
+	"github.com/ungerik/go3d/vec4"
 )
 
 type ModelTexType int
@@ -23,7 +25,7 @@ type ModelTexture struct {
 	TexType   ModelTexType
 	Texture   *render.Texture
 	Animation *textures.Animation
-	BaseColor vec3.T
+	BaseColor vec4.T
 }
 
 func NewModelImageTexture(filename string) (ModelTexture, error) {
@@ -50,10 +52,10 @@ func NewModelAnimTexture(filename string) (ModelTexture, error) {
 	}, nil
 }
 
-func NewModelColorTexture(r, g, b float32) ModelTexture {
+func NewModelColorTexture(r, g, b, a float32) ModelTexture {
 	return ModelTexture{
 		TexType:   MODEL_TEXTURE_NONE,
-		BaseColor: vec3.T{r, g, b},
+		BaseColor: vec4.T{r, g, b, a},
 	}
 }
 
@@ -62,77 +64,110 @@ type LOD struct {
 	Mesh     []render.TBO
 }
 
-type Object3D struct {
+type ModelPart struct {
+	Mesh     []render.TBO
 	Texture  ModelTexture
 	Material shaders.Material
+	LODs     []LOD
+}
+
+type Object3D struct {
+	Parts []ModelPart
 
 	Position vec3.T
 	Rotation mgl32.Quat
 	Scale    vec3.T
 
-	Mesh       []render.TBO
 	BaseRadius float32
-	LODs       []LOD
 
 	isDirty     bool
 	modelMatrix mgl32.Mat4
 	CanBeLit    bool
 	CastShadows bool
 	IsSkybox    bool
+
+	DebugTriCount int
 }
 
-func NewObject3D(position, rotation, scale vec3.T, mesh []render.TBO, texture ModelTexture, Material shaders.Material, canBeLit, castShadows bool) *Object3D {
-	var maxSq float32
-	for _, tbo := range mesh {
-		v0Sq := tbo.V0[0]*tbo.V0[0] + tbo.V0[1]*tbo.V0[1] + tbo.V0[2]*tbo.V0[2]
-		if v0Sq > maxSq {
-			maxSq = v0Sq
-		}
-
-		v1Sq := tbo.V1[0]*tbo.V1[0] + tbo.V1[1]*tbo.V1[1] + tbo.V1[2]*tbo.V1[2]
-		if v1Sq > maxSq {
-			maxSq = v1Sq
-		}
-
-		v2Sq := tbo.V2[0]*tbo.V2[0] + tbo.V2[1]*tbo.V2[1] + tbo.V2[2]*tbo.V2[2]
-		if v2Sq > maxSq {
-			maxSq = v2Sq
-		}
-	}
-	baseRadius := float32(math.Sqrt(float64(maxSq)))
-
+func NewObject3D(position, rotation, scale vec3.T, canBeLit, castShadows bool) *Object3D {
 	return &Object3D{
-		LODs:        make([]LOD, 0),
-		Texture:     texture,
-		Position:    position,
-		Rotation:    mgl32.AnglesToQuat(rotation[0], rotation[1], rotation[2], mgl32.XYZ),
-		Scale:       scale,
-		Mesh:        mesh,
-		BaseRadius:  baseRadius,
-		isDirty:     true,
-		modelMatrix: mgl32.Ident4(),
-		CanBeLit:    canBeLit,
-		CastShadows: castShadows,
-		Material:    Material,
+		Parts:         make([]ModelPart, 0),
+		Position:      position,
+		Rotation:      mgl32.AnglesToQuat(rotation[0], rotation[1], rotation[2], mgl32.XYZ),
+		Scale:         scale,
+		BaseRadius:    0.0,
+		isDirty:       true,
+		modelMatrix:   mgl32.Ident4(),
+		CanBeLit:      canBeLit,
+		CastShadows:   castShadows,
+		DebugTriCount: 0,
 	}
+}
+
+func (o *Object3D) Compose(mesh []render.TBO, texture ModelTexture, material shaders.Material) {
+	if len(mesh) == 0 {
+		return
+	}
+
+	o.Parts = append(o.Parts, ModelPart{
+		Mesh:     mesh,
+		Texture:  texture,
+		Material: material,
+		LODs:     make([]LOD, 0),
+	})
+
+	o.DebugTriCount += len(mesh)
+
+	o.recalculateBaseRadius()
+	o.isDirty = true
+}
+
+func (o *Object3D) recalculateBaseRadius() {
+	var maxSq float32
+	for _, part := range o.Parts {
+		for _, tbo := range part.Mesh {
+			v0Sq := tbo.V0[0]*tbo.V0[0] + tbo.V0[1]*tbo.V0[1] + tbo.V0[2]*tbo.V0[2]
+			if v0Sq > maxSq {
+				maxSq = v0Sq
+			}
+			v1Sq := tbo.V1[0]*tbo.V1[0] + tbo.V1[1]*tbo.V1[1] + tbo.V1[2]*tbo.V1[2]
+			if v1Sq > maxSq {
+				maxSq = v1Sq
+			}
+			v2Sq := tbo.V2[0]*tbo.V2[0] + tbo.V2[1]*tbo.V2[1] + tbo.V2[2]*tbo.V2[2]
+			if v2Sq > maxSq {
+				maxSq = v2Sq
+			}
+		}
+	}
+	o.BaseRadius = float32(math.Sqrt(float64(maxSq)))
 }
 
 func (o *Object3D) ChangeOmniDir(mode bool) {
-	for i := range o.Mesh {
-		o.Mesh[i].OmniDir = mode
-	}
-
-	for k := range o.LODs {
-		for i := range o.LODs[k].Mesh {
-			o.LODs[k].Mesh[i].OmniDir = mode
+	for i := range o.Parts {
+		for j := range o.Parts[i].Mesh {
+			o.Parts[i].Mesh[j].OmniDir = mode
+		}
+		for k := range o.Parts[i].LODs {
+			for j := range o.Parts[i].LODs[k].Mesh {
+				o.Parts[i].LODs[k].Mesh[j].OmniDir = mode
+			}
 		}
 	}
 }
 
-func (o *Object3D) AddLOD(mesh []render.TBO, distance float32) {
-	o.LODs = append(o.LODs, LOD{
+func (o *Object3D) AddPartLOD(partIndex int, mesh []render.TBO, distance float32) {
+	if partIndex < 0 || partIndex >= len(o.Parts) {
+		return
+	}
+
+	o.Parts[partIndex].LODs = append(o.Parts[partIndex].LODs, LOD{
 		Distance: distance,
 		Mesh:     mesh,
+	})
+
+	sort.Slice(o.Parts[partIndex].LODs, func(i, j int) bool {
+		return o.Parts[partIndex].LODs[i].Distance > o.Parts[partIndex].LODs[j].Distance
 	})
 }
 
@@ -140,11 +175,16 @@ func (o *Object3D) UpdateMat() {
 	o.isDirty = true
 }
 
-func (o *Object3D) GetActiveMesh(distance float32) []render.TBO {
-	activeMesh := o.Mesh
+func (o *Object3D) GetActiveMesh(partIndex int, distance float32) []render.TBO {
+	if partIndex < 0 || partIndex >= len(o.Parts) {
+		return nil
+	}
+
+	part := &o.Parts[partIndex]
+	activeMesh := part.Mesh
 	bestDist := float32(-1.0)
 
-	for _, lod := range o.LODs {
+	for _, lod := range part.LODs {
 		if distance >= lod.Distance && lod.Distance > bestDist {
 			activeMesh = lod.Mesh
 			bestDist = lod.Distance
@@ -155,16 +195,20 @@ func (o *Object3D) GetActiveMesh(distance float32) []render.TBO {
 }
 
 func (o *Object3D) Clone() *Object3D {
+	clonedParts := make([]ModelPart, len(o.Parts))
+	copy(clonedParts, o.Parts)
+
 	return &Object3D{
-		Material: o.Material,
-		CanBeLit: o.CanBeLit,
-		LODs:     o.LODs,
-		Texture:  o.Texture,
-		Position: o.Position,
-		Rotation: o.Rotation,
-		Scale:    o.Scale,
-		Mesh:     o.Mesh,
-		isDirty:  true,
+		Parts:       clonedParts,
+		Position:    o.Position,
+		Rotation:    o.Rotation,
+		Scale:       o.Scale,
+		BaseRadius:  o.BaseRadius,
+		isDirty:     true,
+		modelMatrix: mgl32.Ident4(),
+		CanBeLit:    o.CanBeLit,
+		CastShadows: o.CastShadows,
+		IsSkybox:    o.IsSkybox,
 	}
 }
 

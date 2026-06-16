@@ -49,6 +49,8 @@ type Engine struct {
 	SpotShadowFBO    *render.Framebuffer // for Spot Light
 	ShadowVertShader *sapi.VertexShader
 	ShadowFragShader *sapi.FragmentShader
+
+	triCount int
 }
 
 func NewEngine(ctx context.Context) (*Engine, error) {
@@ -229,7 +231,9 @@ func (e *Engine) DrawObjects() error {
 				MVP: dirLightSpaceMatrix.Mul4(model),
 			}
 			(*e.ShadowVertShader).SetUniform("ctx", ctx)
-			e.RScreen.DrawCall(obj.GetActiveMesh(10), e.ShadowFBO)
+			for i := range len(obj.Parts) {
+				e.RScreen.DrawCall(obj.GetActiveMesh(i, 10), e.SpotShadowFBO)
+			}
 		}
 	}
 
@@ -258,7 +262,9 @@ func (e *Engine) DrawObjects() error {
 					MVP: spotLightSpaceMatrix.Mul4(model),
 				}
 				(*e.ShadowVertShader).SetUniform("ctx", ctx)
-				e.RScreen.DrawCall(obj.GetActiveMesh(10), e.SpotShadowFBO)
+				for i := range len(obj.Parts) {
+					e.RScreen.DrawCall(obj.GetActiveMesh(i, 10), e.SpotShadowFBO)
+				}
 			}
 			break
 		}
@@ -324,41 +330,46 @@ func (e *Engine) DrawObjects() error {
 		return renderQueue[i].DistanceToCamera > renderQueue[j].DistanceToCamera
 	})
 
+	e.triCount = 0
 	for _, node := range renderQueue {
 		obj := node.Obj
-		activeMesh := obj.GetActiveMesh(node.DistanceToCamera)
+		for i := range len(obj.Parts) {
+			activeMesh := obj.GetActiveMesh(i, node.DistanceToCamera)
+			e.triCount += len(activeMesh)
 
-		ctx := &shaders.ShaderContext{
-			MVP:     node.MVP,
-			Model:   obj.GetModelMatrix(),
-			ViewPos: e.Camera.Position,
+			part := &obj.Parts[i]
+			ctx := &shaders.ShaderContext{
+				MVP:     node.MVP,
+				Model:   obj.GetModelMatrix(),
+				ViewPos: e.Camera.Position,
 
-			Texture: obj.Texture.Texture,
-			Color:   vec4.T{obj.Texture.BaseColor[0], obj.Texture.BaseColor[1], obj.Texture.BaseColor[2], 1},
+				Texture: part.Texture.Texture,
+				Color:   vec4.T{part.Texture.BaseColor[0], part.Texture.BaseColor[1], part.Texture.BaseColor[2], part.Texture.BaseColor[3]},
 
-			Lights:     e.LightConfig,
-			IsStraight: !obj.CanBeLit,
+				Lights:     e.LightConfig,
+				IsStraight: !obj.CanBeLit,
 
-			HasDirShadow:        hasDirShadow,
-			DirLightSpaceMatrix: dirLightSpaceMatrix,
-			DirShadowDepth:      e.ShadowFBO.DepthBuffer,
-			DirShadowWidth:      e.ShadowFBO.Width,
-			DirShadowHeight:     e.ShadowFBO.Height,
+				HasDirShadow:        hasDirShadow,
+				DirLightSpaceMatrix: dirLightSpaceMatrix,
+				DirShadowDepth:      e.ShadowFBO.DepthBuffer,
+				DirShadowWidth:      e.ShadowFBO.Width,
+				DirShadowHeight:     e.ShadowFBO.Height,
 
-			HasSpotShadow:        hasSpotShadow,
-			SpotLightSpaceMatrix: spotLightSpaceMatrix,
-			SpotShadowDepth:      e.SpotShadowFBO.DepthBuffer,
-			SpotShadowWidth:      e.SpotShadowFBO.Width,
-			SpotShadowHeight:     e.SpotShadowFBO.Height,
-			IsSkybox:             obj.IsSkybox,
+				HasSpotShadow:        hasSpotShadow,
+				SpotLightSpaceMatrix: spotLightSpaceMatrix,
+				SpotShadowDepth:      e.SpotShadowFBO.DepthBuffer,
+				SpotShadowWidth:      e.SpotShadowFBO.Width,
+				SpotShadowHeight:     e.SpotShadowFBO.Height,
+				IsSkybox:             obj.IsSkybox,
 
-			Material: obj.Material,
-		}
+				Material: part.Material,
+			}
 
-		(*e.VertShader).SetUniform("ctx", ctx)
-		(*e.FragShader).SetUniform("ctx", ctx)
-		if err := e.RScreen.DrawCall(activeMesh, e.MainFBO); err != nil {
-			return err
+			(*e.VertShader).SetUniform("ctx", ctx)
+			(*e.FragShader).SetUniform("ctx", ctx)
+			if err := e.RScreen.DrawCall(activeMesh, e.MainFBO); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -375,6 +386,10 @@ func (e *Engine) Blit() {
 
 	e.RScreen.Screen.SetText(
 		0, 1, fmt.Sprintf("Camera: %v\n Direction: %v", e.Camera.Position, e.Camera.Rotation), graphics.NewFGPixel(255, 255, 255, ""),
+	)
+
+	e.RScreen.Screen.SetText(
+		0, 3, fmt.Sprintf("Triangles: %d\nObjects: %d\n", e.triCount, len(e.Objects)), graphics.NewFGPixel(255, 255, 255, ""),
 	)
 
 	e.RScreen.Screen.Blit()

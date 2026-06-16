@@ -31,12 +31,12 @@ func main() {
 		Shininess: 4.0,
 	}
 
-	goldMaterial := shaders.Material{
-		Ambient:   vec3.T{0.24725 * 3, 0.1995 * 3, 0.0745 * 3},
-		Diffuse:   vec3.T{0.75164, 0.60648, 0.22648},
-		Specular:  vec3.T{0.628281, 0.555802, 0.366065},
-		Shininess: 128.0,
-	}
+	// goldMaterial := shaders.Material{
+	// 	Ambient:   vec3.T{0.24725 * 3, 0.1995 * 3, 0.0745 * 3},
+	// 	Diffuse:   vec3.T{0.75164, 0.60648, 0.22648},
+	// 	Specular:  vec3.T{0.628281, 0.555802, 0.366065},
+	// 	Shininess: 128.0,
+	// }
 
 	texturedMaterial := shaders.Material{
 		Ambient:   vec3.T{0.1, 0.1, 0.1},
@@ -50,7 +50,7 @@ func main() {
 	engine.LightConfig.Ambient = lights.AmbientLight{Color: vec3.T{0.1, 0.1, 0.1}}
 	engine.LightConfig.Directional = lights.DirectLight{
 		Color:       vec3.T{1, 1, 1},
-		Direction:   vec3.T{-0.2, -.5, -0.2},
+		Direction:   vec3.T{-0.2, -1, -0.2},
 		CastShadows: false,
 	}
 	spotlight := lights.NewSpotLight(
@@ -99,7 +99,7 @@ func main() {
 
 	// Objects
 
-	grassTex, err := entity.NewModelImageTexture("./assets/textures/water.jpg")
+	grassTex, err := entity.NewModelImageTexture("./assets/textures/grass.jpg")
 	grassTex.Texture.GenerateMipmaps(6)
 
 	if err != nil {
@@ -124,49 +124,64 @@ func main() {
 				vec3.T{posX, 0, posZ},
 				vec3.T{0, 0, 0},
 				vec3.T{1, 1, 1},
-				chunkMesh, grassTex, waterMaterial, true, false,
+				true, false,
 			)
 
-			chunkObj.AddLOD(api.GenerateLOD(chunkMesh, 0.2), 60)
-			chunkObj.AddLOD(api.GenerateLOD(chunkMesh, 0.5), 30)
+			chunkObj.Compose(chunkMesh, grassTex, waterMaterial)
+
+			chunkObj.AddPartLOD(0, api.GenerateLOD(chunkMesh, 0.2), 60)
+			chunkObj.AddPartLOD(0, api.GenerateLOD(chunkMesh, 0.5), 30)
 			id, _ := engine.AddObject(chunkObj)
 
 			chunks = append(chunks, id)
 		}
 	}
 
-	monkey, _ := assets.LoadOBJ("./assets/meshes/suzanne.obj")
-	onigiriTex, _ := entity.NewModelImageTexture("./assets/textures/onigiri.jpg")
+	// monkey, _ := assets.LoadOBJ("./assets/meshes/suzanne.obj")
+	// onigiriTex, _ := entity.NewModelImageTexture("./assets/textures/onigiri.jpg")
 
-	monkeyObj := entity.NewObject3D(
-		vec3.T{0, 100, 0},
+	// monkeyObj := entity.NewObject3D(
+	// 	vec3.T{0, 100, 0},
+	// 	vec3.T{0, 0, 0},
+	// 	vec3.T{30, 30, 30},
+	// 	monkey, onigiriTex, goldMaterial, true, true,
+	// )
+
+	// if _, err = engine.AddObject(monkeyObj); err != nil {
+	// 	panic(err)
+	// }
+
+	treeObjects, _ := assets.LoadOBJ("./assets/meshes/tree.obj")
+	treeTex, _ := entity.NewModelImageTexture("./assets/textures/wood.jpg")
+	leafTex, _ := entity.NewModelImageTexture("./assets/textures/branches_2.png")
+
+	treeObj := entity.NewObject3D(
+		vec3.T{0, 50, 0},
 		vec3.T{0, 0, 0},
-		vec3.T{30, 30, 30},
-		monkey, onigiriTex, goldMaterial, true, true,
+		vec3.T{15, 15, 15},
+		true, true,
 	)
 
-	if _, err = engine.AddObject(monkeyObj); err != nil {
-		panic(err)
-	}
+	treeObj.Compose(treeObjects["tree"], treeTex, texturedMaterial)
+	treeObj.Compose(treeObjects["leaves"], leafTex, texturedMaterial)
 
-	monkeys := make([]int, 0)
-	var s float32 = 300.
-	for range 10 {
-		clone := monkeyObj.Clone()
+	treeObj.AddPartLOD(0, api.GenerateLOD(treeObjects["tree"], 0.5), 70)
+	treeObj.AddPartLOD(0, api.GenerateLOD(treeObjects["tree"], 0.7), 90)
+
+	treeObj.AddPartLOD(1, api.GenerateLOD(treeObjects["leaves"], 0.5), 30)
+	treeObj.AddPartLOD(1, api.GenerateLOD(treeObjects["leaves"], 0.7), 50)
+
+	for range 40 {
+		clone := treeObj.Clone()
 		clone.Position = vec3.T{
-			rand.Float32()*s*2 - s,
-			180 + rand.Float32()*20,
-			rand.Float32()*s*2 - s,
+			rand.Float32()*2000 - 1000,
+			50,
+			rand.Float32()*2000 - 1000,
 		}
-		sc := rand.Float32() + 0.5
-		clone.SetScale(vec3.T{sc * 20, sc * 20, sc * 20})
 
-		var id int
-		if id, err = engine.AddObject(clone); err != nil {
+		if _, err = engine.AddObject(clone); err != nil {
 			panic(err)
 		}
-
-		monkeys = append(monkeys, id)
 	}
 
 	// Skybox
@@ -182,17 +197,18 @@ func main() {
 		vec3.T{0, 0, 0},
 		vec3.T{0, 0, 0},
 		vec3.T{10, 10, 10},
-		skyboxMesh, skyboxTex, texturedMaterial, false, false,
+		false, false,
 	)
 	skyboxObj.IsSkybox = true
+	skyboxObj.Compose(skyboxMesh["default"], skyboxTex, texturedMaterial)
 
 	if _, err = engine.AddObject(skyboxObj); err != nil {
 		panic(err)
 	}
 
-	followId := 0
-	followPath := make([]vec3.T, 0)
-	n := 40
+	// followId := 0
+	// followPath := make([]vec3.T, 0)
+	// n := 40
 
 	// Run
 	zoom := 1.
@@ -229,23 +245,23 @@ func main() {
 		skyboxObj.Position = engine.Camera.Position
 		skyboxObj.UpdateMat()
 
-		monkeyObj.LookAt(engine.Camera.Position, true)
+		// monkeyObj.LookAt(engine.Camera.Position, true)
 
-		if engine.TSystem.Ticks%10 == 0 {
-			start := monkeyObj.Position
-			followPath = make([]vec3.T, 0, n)
-			for i := range n {
-				t := float32(i) / float32(n-1)
-				v := lerp(start, engine.Camera.Position, t)
-				followPath = append(followPath, v)
-			}
-			followId = 0
-		}
+		// if engine.TSystem.Ticks%10 == 0 {
+		// 	start := monkeyObj.Position
+		// 	followPath = make([]vec3.T, 0, n)
+		// 	for i := range n {
+		// 		t := float32(i) / float32(n-1)
+		// 		v := lerp(start, engine.Camera.Position, t)
+		// 		followPath = append(followPath, v)
+		// 	}
+		// 	followId = 0
+		// }
 
-		if followId < len(followPath) {
-			monkeyObj.Position = followPath[followId]
-			followId++
-		}
+		// if followId < len(followPath) {
+		// 	monkeyObj.Position = followPath[followId]
+		// 	followId++
+		// }
 
 		pointlight.Position = engine.Camera.Position
 		engine.Camera.Speed = 200 * engine.TSystem.DeltaTime
@@ -255,25 +271,22 @@ func main() {
 			for cz := -10; cz <= 10; cz++ {
 				chunkMesh := generator.GenerateChunk(cx, cz, chunkSize, chunkSize, float64(engine.TSystem.Ticks)/10)
 
-				obj, err := engine.GetObject(chunks[inDump])
-				if err != nil {
-					panic(err)
-				}
-				obj.Mesh = chunkMesh
+				posX := float32(cx*chunkSize) * cellSize
+				posZ := float32(cz*chunkSize) * cellSize
 
-				obj.LODs = make([]entity.LOD, 0)
-				obj.AddLOD(api.GenerateLOD(chunkMesh, 0.2), 60)
-				obj.AddLOD(api.GenerateLOD(chunkMesh, 0.5), 30)
+				chunkObj := entity.NewObject3D(
+					vec3.T{posX, 0, posZ},
+					vec3.T{0, 0, 0},
+					vec3.T{1, 1, 1},
+					true, false,
+				)
+
+				chunkObj.Compose(chunkMesh, grassTex, waterMaterial)
+
+				chunkObj.AddPartLOD(0, api.GenerateLOD(chunkMesh, 0.2), 60)
+				chunkObj.AddPartLOD(0, api.GenerateLOD(chunkMesh, 0.5), 30)
 				inDump++
 			}
-		}
-
-		for _, mid := range monkeys {
-			obj, err := engine.GetObject(mid)
-			if err != nil {
-				panic(err)
-			}
-			obj.RotateEuler(vec3.T{0.1, 0, 0.3})
 		}
 
 		if engine.TSystem.Ticks%50 == 0 {
@@ -292,10 +305,10 @@ func main() {
 	}
 }
 
-func lerp(a, b vec3.T, t float32) vec3.T {
-	return vec3.T{
-		a[0] + t*(b[0]-a[0]),
-		a[1] + t*(b[1]-a[1]),
-		a[2] + t*(b[2]-a[2]),
-	}
-}
+// func lerp(a, b vec3.T, t float32) vec3.T {
+// 	return vec3.T{
+// 		a[0] + t*(b[0]-a[0]),
+// 		a[1] + t*(b[1]-a[1]),
+// 		a[2] + t*(b[2]-a[2]),
+// 	}
+// }
