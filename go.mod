@@ -5,8 +5,8 @@ go 1.26.3
 require (
 	github.com/aquilax/go-perlin v1.1.0
 	github.com/go-gl/mathgl v1.2.0
-	github.com/striter-no/softgo v0.0.0-20260616093821-fdbbe2a72592
-	github.com/striter-no/stg v0.0.0-20260615151033-8568c566e552
+	github.com/striter-no/softgo v0.0.0-20260616232448-d4bd395835f6
+	github.com/striter-no/stg v0.0.0-20260616102320-4b69d6e93906
 	github.com/ungerik/go3d v0.0.0-20251020194721-1bde1320d420
 )
 

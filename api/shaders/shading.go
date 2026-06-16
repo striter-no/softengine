@@ -15,6 +15,7 @@ type ShaderContext struct {
 	Color   vec4.T
 	ViewPos vec3.T
 
+	Fog        lights.FogConfig
 	Lights     lights.LightingConfig
 	IsStraight bool
 	IsSkybox   bool

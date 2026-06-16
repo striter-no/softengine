@@ -31,7 +31,7 @@ func calculateShadow(fragPos vec4.T, lightSpaceMatrix mgl32.Mat4, shadowDepth []
 		bias := float32(0.005)
 
 		if currentDepth-bias > closestDepth {
-			shadow = 0.8
+			shadow = 0.7
 		}
 	}
 	return shadow
@@ -90,7 +90,7 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 			}
 			distance := float32(math.Sqrt(float64(lDir[0]*lDir[0] + lDir[1]*lDir[1] + lDir[2]*lDir[2])))
 
-			texColor = ctx.Texture.SampleLod(u, v, distance, 20)
+			texColor = ctx.Texture.SampleLod(u, v, distance)
 		} else {
 			texColor = ctx.Texture.Sample(u, v)
 		}
@@ -104,7 +104,49 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 	alpha := texColor[3] / 255.0
 
 	if ctx.IsStraight {
-		return vec4.T{texR, texG, texB, alpha}
+		resultR := texR
+		resultG := texG
+		resultB := texB
+
+		if ctx.IsSkybox {
+			dl := ctx.Lights.Directional
+			lightDir := vec3.T{-dl.Direction[0], -dl.Direction[1], -dl.Direction[2]}
+			lenDL := float32(math.Sqrt(float64(lightDir[0]*lightDir[0] + lightDir[1]*lightDir[1] + lightDir[2]*lightDir[2])))
+			if lenDL > 0 {
+				lightDir[0] /= lenDL
+				lightDir[1] /= lenDL
+				lightDir[2] /= lenDL
+			}
+
+			viewDir := vec3.T{ctx.ViewPos[0] - fragPos[0], ctx.ViewPos[1] - fragPos[1], ctx.ViewPos[2] - fragPos[2]}
+			lenV := float32(math.Sqrt(float64(viewDir[0]*viewDir[0] + viewDir[1]*viewDir[1] + viewDir[2]*viewDir[2])))
+			if lenV > 0 {
+				viewDir[0] /= lenV
+				viewDir[1] /= lenV
+				viewDir[2] /= lenV
+			}
+
+			dotViewLight := viewDir[0]*-lightDir[0] + viewDir[1]*-lightDir[1] + viewDir[2]*-lightDir[2]
+
+			if dotViewLight > 0.96 {
+				isBlocked := false
+				if ctx.HasDirShadow {
+					shadowVal := calculateShadow(fragPos, ctx.DirLightSpaceMatrix, ctx.DirShadowDepth, ctx.DirShadowWidth, ctx.DirShadowHeight)
+					if shadowVal > 0.5 {
+						isBlocked = true
+					}
+				}
+
+				if !isBlocked {
+					flareIntensity := float32(math.Pow(float64(dotViewLight), 128.0))
+					resultR += dl.Color[0] * flareIntensity
+					resultG += dl.Color[1] * flareIntensity
+					resultB += dl.Color[2] * flareIntensity
+				}
+			}
+		}
+
+		return vec4.T{resultR, resultG, resultB, alpha}
 	}
 
 	lenN := float32(math.Sqrt(float64(norm[0]*norm[0] + norm[1]*norm[1] + norm[2]*norm[2])))
@@ -122,10 +164,23 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 		viewDir[2] /= lenV
 	}
 
+	// fogFactor := (lenV - ctx.Fog.Start) / (ctx.Fog.End - ctx.Fog.Start)
+	fogFactor := float32(0)
+	if ctx.Fog.Density != 0 {
+		fogFactor = 1.0 - float32(math.Exp(-float64(lenV*ctx.Fog.Density)))
+	}
+
+	if fogFactor < 0 {
+		fogFactor = 0
+	}
+	if fogFactor > 1 {
+		fogFactor = 1
+	}
+
 	// 1. Ambient
-	resultR := ctx.Material.Ambient[0] * ctx.Lights.Ambient.Color[0]
-	resultG := ctx.Material.Ambient[1] * ctx.Lights.Ambient.Color[1]
-	resultB := ctx.Material.Ambient[2] * ctx.Lights.Ambient.Color[2]
+	resultR := texR * ctx.Material.Ambient[0]
+	resultG := texG * ctx.Material.Ambient[1]
+	resultB := texB * ctx.Material.Ambient[2]
 
 	baseDiffuseR := texR * ctx.Material.Diffuse[0]
 	baseDiffuseG := texG * ctx.Material.Diffuse[1]
@@ -134,6 +189,12 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 	// 2. Directional Light
 	dl := ctx.Lights.Directional
 	lightDir := vec3.T{-dl.Direction[0], -dl.Direction[1], -dl.Direction[2]}
+	lenDL := float32(math.Sqrt(float64(lightDir[0]*lightDir[0] + lightDir[1]*lightDir[1] + lightDir[2]*lightDir[2])))
+	if lenDL > 0 {
+		lightDir[0] /= lenDL
+		lightDir[1] /= lenDL
+		lightDir[2] /= lenDL
+	}
 
 	dirShadow := float32(0.0)
 	if ctx.HasDirShadow {
@@ -148,9 +209,9 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 	)
 
 	shadowFactor := 1.0 - dirShadow
-	resultR += texR * contrib[0] * shadowFactor
-	resultG += texG * contrib[1] * shadowFactor
-	resultB += texB * contrib[2] * shadowFactor
+	resultR += contrib[0] * shadowFactor
+	resultG += contrib[1] * shadowFactor
+	resultB += contrib[2] * shadowFactor
 
 	// 3. Point Lights
 	for _, pl := range ctx.Lights.PointLights {
@@ -169,9 +230,9 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 			ctx.Material.Specular, ctx.Material.Shininess,
 		)
 
-		resultR += texR * contrib[0]
-		resultG += texG * contrib[1]
-		resultB += texB * contrib[2]
+		resultR += contrib[0]
+		resultG += contrib[1]
+		resultB += contrib[2]
 	}
 
 	// 4. Spot Lights
@@ -212,11 +273,15 @@ func fragShader(u float32, v float32, col vec4.T, norm vec3.T, fragPos vec4.T, s
 			)
 
 			spotShadowFactor := 1.0 - spotShadow
-			resultR += texR * contrib[0] * spotShadowFactor
-			resultG += texG * contrib[1] * spotShadowFactor
-			resultB += texB * contrib[2] * spotShadowFactor
+			resultR += contrib[0] * spotShadowFactor
+			resultG += contrib[1] * spotShadowFactor
+			resultB += contrib[2] * spotShadowFactor
 		}
 	}
+
+	resultR = resultR*(1.0-fogFactor) + ctx.Fog.Color[0]*fogFactor
+	resultG = resultG*(1.0-fogFactor) + ctx.Fog.Color[1]*fogFactor
+	resultB = resultB*(1.0-fogFactor) + ctx.Fog.Color[2]*fogFactor
 
 	// Clamp
 	if resultR > 1.0 {

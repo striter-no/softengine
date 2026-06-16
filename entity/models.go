@@ -238,6 +238,141 @@ func (o *Object3D) SetRotationEuler(vec vec3.T) {
 	o.isDirty = true
 }
 
+func (o *Object3D) CalculateDecomposedBoxes(maxBoxes int) ([]vec3.T, []vec3.T) {
+	var allTris []render.TBO
+	for _, part := range o.Parts {
+		allTris = append(allTris, part.Mesh...)
+	}
+
+	if len(allTris) == 0 {
+		return nil, nil
+	}
+
+	groups := [][]render.TBO{allTris}
+
+	for len(groups) < maxBoxes {
+		largestIdx := -1
+		var maxVolume float32 = -1.0
+		var lMin, lMax vec3.T
+
+		for i, group := range groups {
+			if len(group) < 2 {
+				continue
+			}
+			min, max := getGroupAABB(group)
+			vol := (max[0] - min[0]) * (max[1] - min[1]) * (max[2] - min[2])
+
+			if vol > maxVolume {
+				maxVolume = vol
+				largestIdx = i
+				lMin, lMax = min, max
+			}
+		}
+
+		if largestIdx == -1 {
+			break
+		}
+
+		targetGroup := groups[largestIdx]
+
+		dx := lMax[0] - lMin[0]
+		dy := lMax[1] - lMin[1]
+		dz := lMax[2] - lMin[2]
+
+		axis := 0
+		if dy > dx && dy > dz {
+			axis = 1
+		} else if dz > dx && dz > dy {
+			axis = 2
+		}
+
+		mid := lMin[axis] + (lMax[axis]-lMin[axis])/2.0
+
+		var left, right []render.TBO
+		for _, t := range targetGroup {
+			centroid := (t.V0[axis] + t.V1[axis] + t.V2[axis]) / 3.0
+			if centroid < mid {
+				left = append(left, t)
+			} else {
+				right = append(right, t)
+			}
+		}
+
+		if len(left) == 0 || len(right) == 0 {
+			half := len(targetGroup) / 2
+			left = targetGroup[:half]
+			right = targetGroup[half:]
+		}
+
+		groups[largestIdx] = left
+		groups = append(groups, right)
+	}
+
+	var offsets []vec3.T
+	var halfSizes []vec3.T
+
+	for _, group := range groups {
+		if len(group) == 0 {
+			continue
+		}
+
+		min, max := getGroupAABB(group)
+
+		halfX := (max[0] - min[0]) / 2
+		halfY := (max[1] - min[1]) / 2
+		halfZ := (max[2] - min[2]) / 2
+
+		if halfX < 0.01 {
+			halfX = 0.01
+		}
+		if halfY < 0.01 {
+			halfY = 0.01
+		}
+		if halfZ < 0.01 {
+			halfZ = 0.01
+		}
+
+		offsets = append(offsets, vec3.T{
+			(max[0] + min[0]) / 2,
+			(max[1] + min[1]) / 2,
+			(max[2] + min[2]) / 2,
+		})
+		halfSizes = append(halfSizes, vec3.T{halfX, halfY, halfZ})
+	}
+
+	return offsets, halfSizes
+}
+
+func getGroupAABB(group []render.TBO) (vec3.T, vec3.T) {
+	var minX, minY, minZ float32 = math.MaxFloat32, math.MaxFloat32, math.MaxFloat32
+	var maxX, maxY, maxZ float32 = -math.MaxFloat32, -math.MaxFloat32, -math.MaxFloat32
+
+	for _, tbo := range group {
+		for _, v := range []vec3.T{tbo.V0, tbo.V1, tbo.V2} {
+			if v[0] < minX {
+				minX = v[0]
+			}
+			if v[1] < minY {
+				minY = v[1]
+			}
+			if v[2] < minZ {
+				minZ = v[2]
+			}
+
+			if v[0] > maxX {
+				maxX = v[0]
+			}
+			if v[1] > maxY {
+				maxY = v[1]
+			}
+			if v[2] > maxZ {
+				maxZ = v[2]
+			}
+		}
+	}
+	return vec3.T{minX, minY, minZ}, vec3.T{maxX, maxY, maxZ}
+}
+
 func (o *Object3D) LookAt(pos vec3.T, inverse bool) {
 	eye := mgl32.Vec3{o.Position[0], o.Position[1], o.Position[2]}
 	center := mgl32.Vec3{pos[0], pos[1], pos[2]}

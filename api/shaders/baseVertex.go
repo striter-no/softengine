@@ -9,7 +9,7 @@ import (
 	"github.com/ungerik/go3d/vec4"
 )
 
-func vertShader(vert *vec3.T, normal *vec3.T, color *vec4.T, uv *vec2.T, s *api.VertexShader) render.VertexOut {
+func vertShader(vert vec3.T, normal vec3.T, color vec4.T, uv vec2.T, s *api.VertexShader) render.VertexOut {
 	ctxAny, _ := s.GetUniform("ctx")
 	ctx := ctxAny.(*ShaderContext)
 
@@ -28,8 +28,8 @@ func vertShader(vert *vec3.T, normal *vec3.T, color *vec4.T, uv *vec2.T, s *api.
 	return render.VertexOut{
 		Pos:     clipPos,
 		Normal:  vec3.T{transformedNormal[0], transformedNormal[1], transformedNormal[2]},
-		UV:      *uv,
-		Color:   *color,
+		UV:      uv,
+		Color:   color,
 		FragPos: vec3.T{worldPos[0], worldPos[1], worldPos[2]},
 	}
 }

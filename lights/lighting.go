@@ -76,7 +76,14 @@ type LightingConfig struct {
 	SpotLights  map[int]*SpotLight
 }
 
-func GetDirectionalLightSpaceMatrix(lightPos, lightDir vec3.T) mgl32.Mat4 {
+type FogConfig struct {
+	Color   vec3.T
+	Start   float32
+	End     float32
+	Density float32
+}
+
+func GetDirectionalLightSpaceMatrix(lightPos, lightDir vec3.T, shadowRange float32) mgl32.Mat4 {
 	pos := mgl32.Vec3{lightPos[0], lightPos[1], lightPos[2]}
 	dir := mgl32.Vec3{lightDir[0], lightDir[1], lightDir[2]}
 	target := pos.Add(dir)
@@ -87,7 +94,8 @@ func GetDirectionalLightSpaceMatrix(lightPos, lightDir vec3.T) mgl32.Mat4 {
 	}
 
 	lightView := mgl32.LookAtV(pos, target, up)
-	lightProj := mgl32.Ortho(-500, 500, -500, 500, 0.1, 2000.0)
+
+	lightProj := mgl32.Ortho(-shadowRange, shadowRange, -shadowRange, shadowRange, 0.1, 1000.0)
 
 	return lightProj.Mul4(lightView)
 }
@@ -103,7 +111,6 @@ func GetSpotLightSpaceMatrix(lightPos, lightDir vec3.T, fov, aspect, near, far f
 	}
 
 	lightView := mgl32.LookAtV(pos, target, up)
-	// Перспективная проекция для прожектора
 	lightProj := mgl32.Perspective(fov, aspect, near, far)
 
 	return lightProj.Mul4(lightView)

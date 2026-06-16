@@ -1,0 +1,110 @@
+# command-line-arguments
+dreamcore/main.go:484:6: can inline MovePlayer
+dreamcore/main.go:485:38: can inline MovePlayer.func1
+dreamcore/main.go:33:2: can inline main.deferwrap1
+dreamcore/main.go:138:38: can inline main.func2
+dreamcore/main.go:390:41: can inline main.func3
+dreamcore/main.go:25:14: inlining call to log.Printf
+dreamcore/main.go:455:34: inlining call to phyapi.NewCompoundCollider
+dreamcore/main.go:468:35: inlining call to phyapi.AABBHalf
+dreamcore/main.go:468:9: inlining call to phyapi.(*CompoundCollider).Add
+dreamcore/main.go:473:30: inlining call to phyapi.NewStaticNode
+dreamcore/main.go:475:31: inlining call to phyapi.NewDynamicNode
+dreamcore/main.go:478:18: inlining call to phyapi.(*PhysicsNode).SetCompound
+dreamcore/main.go:29:54: inlining call to context.Background
+dreamcore/main.go:35:32: inlining call to api.NewDebugConsole
+dreamcore/main.go:39:27: inlining call to api.SetGlobalDebugConsole
+dreamcore/main.go:80:32: inlining call to shaders.NewBaseFragmentShader
+dreamcore/main.go:81:30: inlining call to shaders.NewBaseVertexShader
+dreamcore/main.go:84:19: inlining call to api.(*Engine).InitCamera
+dreamcore/main.go:145:42: inlining call to entity.NewModelColorTexture
+dreamcore/main.go:169:24: inlining call to strings.HasPrefix
+dreamcore/main.go:184:44: inlining call to entity.NewModelColorTexture
+dreamcore/main.go:221:25: inlining call to entity.(*Object3D).Clone
+dreamcore/main.go:240:39: inlining call to api.DefaultPhysicsDebugStyle
+dreamcore/main.go:242:14: inlining call to api.(*PhysicsDebugSystem).SetStyle
+dreamcore/main.go:243:13: inlining call to api.(*PhysicsDebugSystem).Disable
+dreamcore/main.go:246:42: inlining call to entity.NewModelColorTexture
+dreamcore/main.go:258:44: inlining call to context.Background
+dreamcore/main.go:258:25: inlining call to api.(*Engine).StartPhysicsLoop
+dreamcore/main.go:265:22: inlining call to api.(*Engine).IsRunning
+dreamcore/main.go:268:18: inlining call to api.(*PhysicsDebugSystem).Enabled
+dreamcore/main.go:269:16: inlining call to api.(*PhysicsDebugSystem).Disable
+dreamcore/main.go:271:15: inlining call to api.(*PhysicsDebugSystem).Enable
+dreamcore/main.go:281:17: inlining call to api.DebugLog
+dreamcore/main.go:285:17: inlining call to api.DebugLog
+dreamcore/main.go:292:16: inlining call to api.DebugLog
+dreamcore/main.go:322:35: inlining call to mgl32.DegToRad
+dreamcore/main.go:323:27: inlining call to math.Sin
+dreamcore/main.go:324:28: inlining call to math.Cos
+dreamcore/main.go:325:29: inlining call to math.Cos
+dreamcore/main.go:326:29: inlining call to math.Sin
+dreamcore/main.go:376:30: inlining call to math.Sqrt
+dreamcore/main.go:384:14: inlining call to MovePlayer
+dreamcore/main.go:388:35: inlining call to math.Cos
+dreamcore/main.go:414:22: inlining call to entity.(*Object3D).UpdateMat
+dreamcore/main.go:432:31: inlining call to api.(*Engine).DrawObjects
+dreamcore/main.go:435:19: inlining call to api.(*Engine).DrawScene
+dreamcore/main.go:446:14: inlining call to api.(*Engine).Blit
+dreamcore/main.go:80:32: inlining call to api.NewFragShader
+dreamcore/main.go:81:30: inlining call to api.NewVertexShader
+dreamcore/main.go:84:19: inlining call to api.NewCamera
+dreamcore/main.go:169:24: inlining call to stringslite.HasPrefix
+dreamcore/main.go:221:25: inlining call to mgl32.Ident4
+dreamcore/main.go:243:13: inlining call to api.(*PhysicsDebugSystem).clearMesh
+dreamcore/main.go:265:22: inlining call to api.(*RenderScreen).IsOpen
+dreamcore/main.go:269:16: inlining call to api.(*PhysicsDebugSystem).clearMesh
+dreamcore/main.go:435:19: inlining call to api.(*RenderSystem).PresentScene
+dreamcore/main.go:84:19: inlining call to mgl32.Ident4
+dreamcore/main.go:265:22: inlining call to graphics.(*Screen).IsRunning
+/usr/lib/go/src/log/log.go:408:24: leaking param: b to result ~r0 level=0
+dreamcore/main.go:25:14: ... argument does not escape
+dreamcore/main.go:25:14: func literal does not escape
+dreamcore/main.go:452:24: leaking param content: engine
+dreamcore/main.go:452:55: leaking param: obj
+dreamcore/main.go:455:34: &phyapi.CompoundCollider{...} escapes to heap
+dreamcore/main.go:455:34: make([]phyapi.CompoundItem, 0, phyapi.cap) escapes to heap
+dreamcore/main.go:468:9: append escapes to heap
+dreamcore/main.go:473:30: &phyapi.PhysicsNode{...} escapes to heap
+dreamcore/main.go:475:31: &phyapi.PhysicsNode{...} escapes to heap
+dreamcore/main.go:485:43: node does not escape
+dreamcore/main.go:390:46: n does not escape
+dreamcore/main.go:23:8: func literal does not escape
+dreamcore/main.go:29:54: context.backgroundCtx{} escapes to heap
+dreamcore/main.go:35:32: &api.DebugConsole{...} escapes to heap
+dreamcore/main.go:35:32: make([]string, 0, api.maxLines) escapes to heap
+dreamcore/main.go:69:16: &lights.PointLight{...} escapes to heap
+dreamcore/main.go:80:32: &api.FragmentShader{...} escapes to heap
+dreamcore/main.go:80:32: make(map[string]any, 0) escapes to heap
+dreamcore/main.go:81:30: &api.VertexShader{...} escapes to heap
+dreamcore/main.go:81:30: make(map[string]any, 0) escapes to heap
+dreamcore/main.go:84:19: &api.Camera{...} escapes to heap
+dreamcore/main.go:90:12: ... argument does not escape
+dreamcore/main.go:90:13: "Failed to load sound" escapes to heap
+dreamcore/main.go:94:12: ... argument does not escape
+dreamcore/main.go:94:13: "Failed to load sound" escapes to heap
+dreamcore/main.go:100:12: ... argument does not escape
+dreamcore/main.go:100:13: "Failed to load sound" escapes to heap
+dreamcore/main.go:138:38: func literal escapes to heap
+dreamcore/main.go:221:25: make([]entity.ModelPart, len(entity.o.Parts)) escapes to heap
+dreamcore/main.go:221:25: &entity.Object3D{...} escapes to heap
+dreamcore/main.go:243:13: []render.TBO{} escapes to heap
+dreamcore/main.go:258:44: context.backgroundCtx{} escapes to heap
+dreamcore/main.go:269:16: []render.TBO{} escapes to heap
+dreamcore/main.go:292:16: ... argument does not escape
+dreamcore/main.go:292:61: (*phyapi.PhysicsSystem).IsPaused(engine.Physics) escapes to heap
+dreamcore/main.go:384:14: func literal does not escape
+dreamcore/main.go:390:41: func literal does not escape
+dreamcore/main.go:437:31: []string{...} escapes to heap
+dreamcore/main.go:438:15: ... argument does not escape
+dreamcore/main.go:438:43: engine.TSystem.FPS escapes to heap
+dreamcore/main.go:439:15: ... argument does not escape
+dreamcore/main.go:439:54: engine.Render.TriCount escapes to heap
+dreamcore/main.go:439:83: (*api.SceneSystem).Count(engine.Scene) escapes to heap
+dreamcore/main.go:440:15: ... argument does not escape
+dreamcore/main.go:440:39: playerObj.Position escapes to heap
+dreamcore/main.go:441:15: ... argument does not escape
+dreamcore/main.go:441:43: engine.Camera.Position escapes to heap
+dreamcore/main.go:484:17: leaking param content: engine
+dreamcore/main.go:485:43: node does not escape
+dreamcore/main.go:485:38: func literal does not escape

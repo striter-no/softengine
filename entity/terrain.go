@@ -2,7 +2,6 @@ package entity
 
 import (
 	"math"
-	"math/rand"
 	"time"
 
 	"github.com/aquilax/go-perlin"
@@ -39,7 +38,7 @@ type TerrainGenerator struct {
 
 func NewTerrainGenerator(heightScale float32, noiseScale float64, cellSize float32) *TerrainGenerator {
 	return &TerrainGenerator{
-		p:           perlin.NewPerlinRandSource(2, 2, 2, rand.NewSource(time.Now().Unix())),
+		p:           perlin.NewPerlin(2, 2, 2, time.Now().Unix()),
 		heightScale: heightScale,
 		noiseScale:  noiseScale,
 		cellSize:    cellSize,
@@ -146,4 +145,32 @@ func (g *TerrainGenerator) GenerateChunk(chunkX, chunkZ int, cellsX, cellsZ int,
 	}
 
 	return mesh
+}
+
+func (g *TerrainGenerator) GetGridHeight(gx, gz int, zShift float64) float32 {
+	rawNoise := g.perlinNoise(float64(gx)*g.noiseScale, float64(gz)*g.noiseScale, zShift*g.noiseScale)
+	rawNoise = (rawNoise + 1.0) / 2.0
+	return float32(rawNoise) * g.heightScale
+}
+
+func (g *TerrainGenerator) GetHeightAt(worldX, worldZ float32, zShift float64) float32 {
+	gridXFloat := worldX / g.cellSize
+	gridZFloat := worldZ / g.cellSize
+
+	cellX := int(math.Floor(float64(gridXFloat)))
+	cellZ := int(math.Floor(float64(gridZFloat)))
+
+	fracX := gridXFloat - float32(cellX)
+	fracZ := gridZFloat - float32(cellZ)
+
+	h00 := g.GetGridHeight(cellX, cellZ, zShift)
+	h01 := g.GetGridHeight(cellX, cellZ+1, zShift)
+	h10 := g.GetGridHeight(cellX+1, cellZ, zShift)
+	h11 := g.GetGridHeight(cellX+1, cellZ+1, zShift)
+
+	if fracX+fracZ <= 1.0 {
+		return h00 + (h10-h00)*fracX + (h01-h00)*fracZ
+	} else {
+		return h11 + (h01-h11)*(1.0-fracX) + (h10-h11)*(1.0-fracZ)
+	}
 }
